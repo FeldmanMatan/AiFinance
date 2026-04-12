@@ -1,0 +1,29 @@
+/* Basic UI improvements for Streamlit app */
+:root{
+  --accent: #0b5cff;
+  --muted: #6b7280;
+}
+
+/* Page spacing */
+.css-1d391kg { padding-top: 10px; }
+
+/* Title styling */
+h1, .stApp h1 { color: var(--accent); font-weight:700; }
+
+/* Sidebar tweaks */
+.stSidebar { background-color: #f8fafc; }
+.stSidebar .css-1d391kg { padding-top: 8px; }
+
+/* Metrics spacing */
+.metric-block { display:flex; gap:16px; align-items:center; }
+
+/* Dataframe container tweaks */
+.streamlit-expanderHeader { font-weight:600; }
+
+/* Make download button stand out */
+.stDownloadButton>button{ background:var(--accent); color:#fff; }
+
+/* Reduce large default margins on mobile */
+@media (max-width: 600px){
+  .css-1d391kg { padding-left: 8px; padding-right: 8px; }
+}

@@ -1,0 +1,33 @@
+# --- Credentials and Security (CRITICAL) ---
+.env
+service_account.json
+secrets.json
+*.pem
+*.key
+
+# --- Local Financial Data and Backups ---
+json_backups/
+extracted_data/
+*.json
+app.log
+app.log.*
+
+# --- Python Environment ---
+venv/
+env/
+ENV/
+bin/
+lib/
+include/
+__pycache__/
+*.py[cod]
+*$py.class
+
+# --- IDE and Workspace Settings ---
+.vscode/
+.idea/
+.DS_Store
+*.swp
+
+# --- Streamlit Internal Logs ---
+.streamlit/
