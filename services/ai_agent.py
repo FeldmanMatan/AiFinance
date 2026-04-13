@@ -12,6 +12,69 @@ GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
 logger = logging.getLogger("AppLogger")
 
+
+def _serialize_chat_history(chat_history, max_messages=8):
+    if not chat_history:
+        return "No previous conversation."
+
+    serialized_messages = []
+    for message in chat_history[-max_messages:]:
+        role = message.get("role", "user")
+        content = str(message.get("content", "")).strip()
+        if not content:
+            continue
+        serialized_messages.append(f"{role.upper()}: {content}")
+
+    return "\n".join(serialized_messages) if serialized_messages else "No previous conversation."
+
+
+def run_chat_agent(user_message, active_user, portfolio_data=None, chat_history=None):
+    if not GOOGLE_API_KEY:
+        return "חסר מפתח API של Gemini ולכן הצ'אט לא זמין כרגע."
+
+    portfolio_data = portfolio_data or []
+    chat_history = chat_history or []
+
+    try:
+        client = genai.Client(api_key=GOOGLE_API_KEY)
+        portfolio_json = json.dumps(portfolio_data, ensure_ascii=False, indent=2)
+        conversation_text = _serialize_chat_history(chat_history)
+
+        prompt = f"""
+        You are Ai Finance Chat, an in-app assistant for Israeli pension and investment tracking.
+
+        RULES:
+        - Reply in HEBREW unless the user writes in another language.
+        - Be concise, practical, and friendly.
+        - Base portfolio-specific answers only on the provided data.
+        - If the data is missing, say so clearly.
+        - Do not present your answer as regulated financial advice.
+        - If the user asks for calculations, explain them clearly.
+
+        ACTIVE USER:
+        {active_user}
+
+        PORTFOLIO DATA:
+        {portfolio_json}
+
+        PREVIOUS CHAT:
+        {conversation_text}
+
+        USER MESSAGE:
+        {user_message}
+        """
+
+        response = client.models.generate_content(
+            model=GEMINI_MODEL,
+            contents=prompt,
+            config=types.GenerateContentConfig(temperature=0.4)
+        )
+
+        return response.text.strip() if response.text else "לא הצלחתי לייצר תשובה. נסה לנסח את השאלה מחדש."
+    except Exception as e:
+        logger.error(f"AI Chat failed: {e}")
+        return "אירעה שגיאה בזמן יצירת התשובה. נסה שוב בעוד רגע."
+
 def run_extraction_agent(uploaded_file, user_id):
     if not GOOGLE_API_KEY: return {"error": "Missing API Key"}
     try:

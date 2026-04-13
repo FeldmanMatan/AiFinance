@@ -11,6 +11,7 @@ Ai Finance is a specialized FinTech application built with Python. It utilizes L
 - **Smart Data Synchronization:** Features a "Compound Key" upsert logic to prevent duplicate records and ensure data integrity even when reports are uploaded multiple times.
 - **Interactive Dashboard:** A Streamlit-based interface providing real-time metrics and asset allocation visualization (Pie Charts) using Plotly.
 - **AI Financial Analyst:** An integrated agent with **Google Search Grounding** that analyzes the portfolio against current market trends and provides actionable recommendations in Hebrew.
+- **In-App Chat Assistant:** A Gemini-powered chat panel inside the dashboard that answers user questions about the selected portfolio and uploaded fund data.
 - **Modular Architecture:** Cleanly separated services for AI processing, database management, and UI rendering for high maintainability.
 
 ## Tech Stack

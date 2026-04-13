@@ -13,7 +13,7 @@ from logging.handlers import RotatingFileHandler
 # Import our custom modules
 from utils.helpers import backup_json_locally, clean_number
 from services.db_manager import save_data_to_sheet, fetch_data_for_user, update_tag_in_sheet
-from services.ai_agent import run_extraction_agent, run_analyst_agent
+from services.ai_agent import run_extraction_agent, run_analyst_agent, run_chat_agent
 
 # --- LOGGING SETUP (ROTATING LOGS) ---
 logger = logging.getLogger("AppLogger")
@@ -54,18 +54,24 @@ st.sidebar.title("Navigation")
 active_user = st.sidebar.selectbox("Profile", ["Matan", "Client A", "Client B"])
 menu = st.sidebar.radio("Go to:", ["Dashboard", "Upload"])
 
+if "chat_sessions" not in st.session_state:
+    st.session_state.chat_sessions = {}
+
+if "chat_open" not in st.session_state:
+    st.session_state.chat_open = True
+
 if menu == "Dashboard":
     st.title(f"Financial Overview: {active_user}")
     
     logger.info(f"Loading dashboard for user: {active_user}")
     data = fetch_data_for_user(active_user)
+    raw_ai_portfolio = []
     
     if not data:
         st.info("No data yet. Please upload a report.")
     else:
         total = pension = hishtalmut = gemel = 0.0
         display = []
-        raw_ai_portfolio = []
         fund_ai_mapping = {}
         selector_list = []
         
@@ -168,6 +174,60 @@ if menu == "Dashboard":
                         specific_data = fund_ai_mapping[fund_to_analyze]
                         res = run_analyst_agent(specific_data, analysis_type="fund")
                         with st.expander(f"📄 Report - {fund_to_analyze}", expanded=True): st.markdown(res)
+
+    default_message = {
+        "role": "assistant",
+        "content": f"שלום, אני העוזר של {active_user}. אפשר לשאול אותי על התיק, על סוגי הקופות ועל הנתונים שהועלו למערכת."
+    }
+    active_chat = st.session_state.chat_sessions.setdefault(active_user, [default_message])
+
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("AI Chat")
+    if st.sidebar.button(
+        "Close Chat" if st.session_state.chat_open else "Open Chat",
+        key=f"toggle_chat_{active_user}"
+    ):
+        st.session_state.chat_open = not st.session_state.chat_open
+        st.rerun()
+
+    if st.session_state.chat_open:
+        st.sidebar.caption(f"Chat about {active_user}'s portfolio.")
+
+        if st.sidebar.button("Clear Chat", key=f"clear_chat_{active_user}"):
+            st.session_state.chat_sessions[active_user] = [default_message]
+            st.rerun()
+
+        if not raw_ai_portfolio:
+            st.sidebar.info("General chat works now. Portfolio-specific answers improve after uploading data.")
+
+        chat_container = st.sidebar.container()
+        with chat_container:
+            for message in active_chat:
+                speaker = "You" if message["role"] == "user" else "Bot"
+                st.markdown(f"**{speaker}:** {message['content']}")
+
+        with st.sidebar.form(key=f"chat_form_{active_user}", clear_on_submit=True):
+            prompt = st.text_area(
+                "Message",
+                placeholder="Ask about balances, funds, fees, or next actions...",
+                height=80,
+                key=f"chat_prompt_{active_user}"
+            )
+            send_chat = st.form_submit_button("Send")
+
+        if send_chat and prompt.strip():
+            prompt = prompt.strip()
+            active_chat.append({"role": "user", "content": prompt})
+            with st.sidebar.spinner("Thinking..."):
+                reply = run_chat_agent(
+                    user_message=prompt,
+                    active_user=active_user,
+                    portfolio_data=raw_ai_portfolio,
+                    chat_history=active_chat[:-1]
+                )
+
+            active_chat.append({"role": "assistant", "content": reply})
+            st.rerun()
 
 elif menu == "Upload":
     st.title(f"Upload for {active_user}")
