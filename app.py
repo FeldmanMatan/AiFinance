@@ -37,7 +37,6 @@ logger.addHandler(console_handler)
 
 logger.info("--- Streamlit UI Initialized / Refreshed ---")
 
-
 def load_local_css(path: str):
     try:
         with open(path, "r", encoding="utf-8") as fh:
@@ -49,7 +48,7 @@ def load_local_css(path: str):
 load_local_css("static/styles.css")
 
 # --- STREAMLIT UI ---
-st.set_page_config(page_title="Pension Tracker", layout="wide")
+st.set_page_config(page_title="Ai Finance Tracker", layout="wide")
 st.sidebar.title("Navigation")
 active_user = st.sidebar.selectbox("Profile", ["Matan", "Client A", "Client B"])
 menu = st.sidebar.radio("Go to:", ["Dashboard", "Upload"])
@@ -87,7 +86,6 @@ if menu == "Dashboard":
             tag = r[9] if len(r) > 9 else ""
             link = r[10] if len(r) > 10 else ""
 
-            # Use the aggressive cleaner from utils
             bal = clean_number(bal_str)
             
             total += bal
@@ -100,7 +98,17 @@ if menu == "Dashboard":
                 "Track": track, "Balance": f"₪ {bal:,.2f}", "Tag": tag, "Link": link
             })
             
-            raw_ai_portfolio.append({"Provider": prov, "Type": ftype, "Track": track, "Balance": bal})
+            # --- FIX: Added Policy, Tag, and explicit Fee fields so the Bot knows everything ---
+            raw_ai_portfolio.append({
+                "Policy": pol,
+                "Provider": prov, 
+                "Type": ftype, 
+                "Track": track, 
+                "Balance": bal,
+                "Fee (Acc)": fee1,
+                "Fee (Dep)": fee2,
+                "Tag": tag
+            })
             
             if pol:
                 selector_string = f"{pol} | {prov} - {ftype} (Owner: {oid})"
@@ -175,6 +183,7 @@ if menu == "Dashboard":
                         res = run_analyst_agent(specific_data, analysis_type="fund")
                         with st.expander(f"📄 Report - {fund_to_analyze}", expanded=True): st.markdown(res)
 
+    # --- SIDEBAR CHAT UI IMPROVEMENT ---
     default_message = {
         "role": "assistant",
         "content": f"שלום, אני העוזר של {active_user}. אפשר לשאול אותי על התיק, על סוגי הקופות ועל הנתונים שהועלו למערכת."
@@ -182,50 +191,47 @@ if menu == "Dashboard":
     active_chat = st.session_state.chat_sessions.setdefault(active_user, [default_message])
 
     st.sidebar.markdown("---")
-    st.sidebar.subheader("AI Chat")
-    if st.sidebar.button(
-        "Close Chat" if st.session_state.chat_open else "Open Chat",
-        key=f"toggle_chat_{active_user}"
-    ):
-        st.session_state.chat_open = not st.session_state.chat_open
-        st.rerun()
+    st.sidebar.subheader("💬 AI Chat")
+    
+    col1, col2 = st.sidebar.columns(2)
+    with col1:
+        if st.button("Close Chat" if st.session_state.chat_open else "Open Chat", key=f"toggle_chat_{active_user}"):
+            st.session_state.chat_open = not st.session_state.chat_open
+            st.rerun()
+    with col2:
+        if st.session_state.chat_open:
+            if st.button("Clear Chat", key=f"clear_chat_{active_user}"):
+                st.session_state.chat_sessions[active_user] = [default_message]
+                st.rerun()
 
     if st.session_state.chat_open:
-        st.sidebar.caption(f"Chat about {active_user}'s portfolio.")
+        st.sidebar.caption(f"Chatting about {active_user}'s portfolio.")
 
-        if st.sidebar.button("Clear Chat", key=f"clear_chat_{active_user}"):
-            st.session_state.chat_sessions[active_user] = [default_message]
-            st.rerun()
-
-        if not raw_ai_portfolio:
-            st.sidebar.info("General chat works now. Portfolio-specific answers improve after uploading data.")
-
-        chat_container = st.sidebar.container()
+        # Fixed-height container for chat messages
+        chat_container = st.sidebar.container(height=400)
         with chat_container:
             for message in active_chat:
-                speaker = "You" if message["role"] == "user" else "Bot"
-                st.markdown(f"**{speaker}:** {message['content']}")
+                with st.chat_message(message["role"]):
+                    st.markdown(message["content"])
 
-        with st.sidebar.form(key=f"chat_form_{active_user}", clear_on_submit=True):
-            prompt = st.text_area(
-                "Message",
-                placeholder="Ask about balances, funds, fees, or next actions...",
-                height=80,
-                key=f"chat_prompt_{active_user}"
-            )
-            send_chat = st.form_submit_button("Send")
-
-        if send_chat and prompt.strip():
-            prompt = prompt.strip()
+        # Modern Streamlit chat input
+        if prompt := st.sidebar.chat_input("שאל אותי משהו על התיק..."):
+            # Instantly display user message
             active_chat.append({"role": "user", "content": prompt})
-            with st.sidebar.spinner("Thinking..."):
+            with chat_container:
+                with st.chat_message("user"):
+                    st.markdown(prompt)
+            
+            # Get AI response
+            with st.sidebar.spinner("חושב..."):
                 reply = run_chat_agent(
                     user_message=prompt,
                     active_user=active_user,
                     portfolio_data=raw_ai_portfolio,
-                    chat_history=active_chat[:-1]
+                    chat_history=active_chat[:-1] # Give history excluding the message we just added
                 )
 
+            # Display and save AI response
             active_chat.append({"role": "assistant", "content": reply})
             st.rerun()
 
